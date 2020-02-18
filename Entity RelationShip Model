@@ -1,0 +1,76 @@
+-- Each car belongs to a single customer
+-- A customer may own more than one car
+
+Table Customer  {
+  id int [pk, increment] // auto-increment
+  full_name varchar
+  address varchar 
+  ph_number varchar
+  cardDetails varchar
+}
+
+Table Car {
+  id int [pk, increment]
+  company varchar
+  Model varchar
+  Registration varchar
+  customer_id int [ref: > Customer.id] // inline relationship (many-to-one)
+}
+
+--“Grease & Oil” employ mechanics, auto electricians and car detailers/polishers. There is a
+--different hourly labor rate for each of these three categories of work
+Application keeps an in memory record for what all eployees worked and for how long.
+At the end of service it calculates charges for each employee as per time they worked.
+
+Table Employees {
+  id int [pk, increment] // auto-increment
+  full_name varchar
+  Type char 
+  isExternal char
+  chargesPerHr double
+ }
+ 
+-- A customer may bring in a car for service and/or repairs many times.
+ServiceLog table maintain an entry for each time a customer brings car for service (customerId + CarId + ServiceDateTime as unique Key)
+
+-- Each time a car comes in for repair or a service a log sheet is kept of all parts used and labor
+-- undertaken. This log is used to create the customer invoice, and a copy of the log is given to the
+-- customer along with the invoice
+Application will first create an entry when service starts.
+
+--No inventory records are maintained. Common parts like nuts and bolts are drawn from stock,
+--but all other parts are bought in from suppliers only as required
+Keeps an in memory record of what all parts used and their price.
+
+At the end of service application updates ServiceLog table record with all employees and part details and total of service cost.
+This record can be directly printed to generate invoice for customer.
+
+
+Table ServiceLog {
+  customer_id int [ref: > Customer.id]
+  car_id int [ref: > Car.id]
+  serviceStartTime datetime
+  serviceEndTime datetime
+  employeeWorkDetails varchar
+  partUsedDetails varchar
+  totalServiceCost double
+  isSettled char
+}
+
+--Customers are expected to settle their accounts monthly by cheque or on presentation of their
+--credit card
+When customer comes for monthly settlment use below query::
+select * from ServiceLog where CustomerId = <Input1> and isSettled = 'N'
+
+This will return all reocrds for which customer have to pay.
+Post recieveing payment unpdate serviceLog:
+upate ServiceLog set isSettled = 'Y' where customer_id = <Input1>
+
+--“Grease & Oil” like to send out reminders to customers when their cars are overdue for a service
+To filter out to whom we need to send reminder use below query::
+@DateVar = getToday's date
+
+select distinct customer_id, car_id, max(serviceEndTime) from ServiceLog
+group by customer_id,car_id
+
+use result from above query to as @DateVar - max(serviceEndTime) >= 30 days--for monthly notifications
